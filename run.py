@@ -39,7 +39,6 @@ def find_next(active, search, current, end):
 		if tile[0].score == 0 or new_score < tile[0].score: tile[0].score = new_score
 		tile[0].state = color.ACTIVE
 		active.add(tile[0])
-		# print(tile[0].x, tile[0].y, tile[0].score_to_end, tile[0].score)
 
 def main():
 
@@ -57,6 +56,7 @@ def main():
 	active = set()
 	smallest = start
 
+	# main loop
 	running = True
 	while running:
 		#-------EVENTS-------#
@@ -136,15 +136,21 @@ def main():
 			except KeyError:
 				soling = False
 
-			# solving = False
-
+			####################################
+			# TODO step by step path finding   #
+			# solving = False				   #
+			####################################
 
 
 		#-------MOUSE-------#
 		mouse_pressed = pygame.mouse.get_pressed()
 		if 1 in mouse_pressed:
 			clicked = tiles[pos[1] * c.size + pos[0]]
+
+			# forbidding overriting important tiles
 			if clicked.state in (color.END, color.START, color.ACTIVE, color.PATH, color.EXPLORED): pass
+
+			# wall or start
 			elif mouse_pressed[0] and clicked.state not in (color.START, color.END):
 				
 				if pygame.key.get_pressed()[pygame.K_LSHIFT]:
@@ -155,6 +161,7 @@ def main():
 				else:
 					clicked.state = color.WALL
 
+			# empty or end
 			elif mouse_pressed[2] and clicked.state not in (color.START, color.END):
 				if pygame.key.get_pressed()[pygame.K_LSHIFT]:
 					end.state = color.EMPTY
@@ -162,8 +169,6 @@ def main():
 					end.state = color.END
 				else:
 					clicked.state = color.EMPTY
-
-
 
 		display(window, tiles)
 
