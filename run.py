@@ -83,7 +83,7 @@ def main():
 				if event.key == pygame.K_SPACE:
 					if solving: solving = False
 
-					elif active:
+					elif active and not smallest:
 						for tile in tiles:
 							if tile.state not in (color.START, color.END, color.WALL):
 								tile.state = color.EMPTY
@@ -124,6 +124,7 @@ def main():
 						if smallest.state == color.PATH or (tile.score - tile.score_to_end) < (smallest.score - smallest.score_to_end):
 							smallest = tile
 					display(window, tiles)
+				smallest = None
 				continue
 
 			# next tile with the smallest value
@@ -144,7 +145,7 @@ def main():
 
 		#-------MOUSE-------#
 		mouse_pressed = pygame.mouse.get_pressed()
-		if 1 in mouse_pressed:
+		if -1 not in pos and c.size not in pos and 1 in mouse_pressed:
 			clicked = tiles[pos[1] * c.size + pos[0]]
 
 			# forbidding overriting important tiles
