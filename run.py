@@ -82,12 +82,24 @@ def main():
 				# solving
 				if event.key == pygame.K_SPACE:
 					if solving: solving = False
+
+					elif active:
+						for tile in tiles:
+							if tile.state not in (color.START, color.END, color.WALL):
+								tile.state = color.EMPTY
+								tile.score = tile.score_to_end = 0
+						active = set()
+						smallest = start
+
 					else: solving = True
 
 				# erase
 				elif event.key == pygame.K_ESCAPE:
+					if pygame.key.get_pressed()[pygame.K_LSHIFT]:
+						erase = (color.START, color.END, color.WALL)
+					else: erase = (color.START, color.END)
 					for tile in tiles:
-						if tile not in (start, end):
+						if tile.state not in erase:
 							tile.state = color.EMPTY
 							tile.score = tile.score_to_end = 0
 					active = set()
@@ -98,31 +110,32 @@ def main():
 		if solving:
 			if smallest != start: smallest.state = color.EXPLORED
 
+			# after reaching the end
 			surrounding = [tile[0] for tile in around(smallest, tiles)]
 			if end in surrounding:
 				solving = False
 
+				# the exact shortest path
 				while start not in surrounding:
 					smallest.state = color.PATH
 					surrounding = [tile[0] for tile in around(smallest, tiles)]
 					for tile in surrounding:
 						if tile.state != color.EXPLORED: continue
 						if smallest.state == color.PATH or (tile.score - tile.score_to_end) < (smallest.score - smallest.score_to_end):
-							#print(smallest.score_to_end - smallest.score)
-							#print(tile.score_to_end - tile.score)
-							#print()
 							smallest = tile
 					display(window, tiles)
 				continue
 
+			# next tile with the smallest value
 			find_next(active, around(smallest, tiles), smallest, end)
 			for i, tile in enumerate(list(active)):
 				if i == 0 or tile.score < smallest.score: smallest = tile
 				if tile.score == smallest.score and tile.score_to_end < smallest.score_to_end: smallest = tile
+			try:
+				active.remove(smallest)
+			except KeyError:
+				soling = False
 
-			active.remove(smallest)
-			# sleep(.01)
-			#print(smallest.x, smallest.y)
 			# solving = False
 
 
@@ -130,21 +143,25 @@ def main():
 		#-------MOUSE-------#
 		mouse_pressed = pygame.mouse.get_pressed()
 		if 1 in mouse_pressed:
-
-			if mouse_pressed[0] and tiles[pos[0] * c.size + pos[1]] not in (start, end):
+			clicked = tiles[pos[1] * c.size + pos[0]]
+			if clicked.state in (color.END, color.START, color.ACTIVE, color.PATH, color.EXPLORED): pass
+			elif mouse_pressed[0] and clicked.state not in (color.START, color.END):
+				
 				if pygame.key.get_pressed()[pygame.K_LSHIFT]:
 					start.state = color.EMPTY
-					start = tiles[pos[1] * c.size + pos[0]]
+					start = clicked
 					start.state = color.START
 					smallest = start
-				else: tiles[pos[1] * c.size + pos[0]].state = color.WALL
+				else:
+					clicked.state = color.WALL
 
-			if mouse_pressed[2] and tiles[pos[0] * c.size + pos[1]] not in (start, end):
+			elif mouse_pressed[2] and clicked.state not in (color.START, color.END):
 				if pygame.key.get_pressed()[pygame.K_LSHIFT]:
 					end.state = color.EMPTY
 					end = tiles[pos[1] * c.size + pos[0]]
 					end.state = color.END
-				else: tiles[pos[1] * c.size + pos[0]].state = color.EMPTY
+				else:
+					clicked.state = color.EMPTY
 
 
 
