@@ -18,14 +18,27 @@ def display(window, tiles):
 def around(center, tiles):
 	xy = (center.x, center.y)
 	out = []
-	for i in ((-1, -1), (1, 1), (-1, 1), (1, -1)):
+	corners = []
+
+
+	for i in ((-1, 0), (0, -1), (0, 1), (1, 0)):
+		temp = (xy[0] + i[0], xy[1] + i[1])
+		if not (-1 in temp or c.size in temp) and tiles[temp[1]*c.size + temp[0]].state != color.WALL:
+			out.append((tiles[temp[1]*c.size + temp[0]], 10))
+			corners.append(i)
+
+	# not allowing going through connected corners
+	coodinates = [] 
+	for i in range(-1, 2, 2):
+		for j in range(-1, 2, 2):
+			if (i, 0) in corners or (0, j) in corners:
+				coodinates.append((i, j))
+
+	for i in coodinates:
 		temp = (xy[0] + i[0], xy[1] + i[1])
 		if not (-1 in temp or c.size in temp):
 			out.append((tiles[temp[1]*c.size + temp[0]], 14))
-	for i in ((-1, 0), (1, 0), (0, -1), (0, 1)):
-		temp = (xy[0] + i[0], xy[1] + i[1])
-		if not (-1 in temp or c.size in temp):
-			out.append((tiles[temp[1]*c.size + temp[0]], 10))
+	
 	return out
 
 def find_next(active, search, current, end):
@@ -41,6 +54,7 @@ def find_next(active, search, current, end):
 		active.add(tile[0])
 
 def main():
+	pygame.display.set_icon(pygame.image.load('icon.png'))
 
 	# not meant to change
 	tiles = [Tile(i%c.size, i//c.size) for i in range(c.size**2)]
@@ -55,6 +69,7 @@ def main():
 	solving = False
 	active = set()
 	smallest = start
+	wheel = False
 
 	# main loop
 	running = True
@@ -71,11 +86,15 @@ def main():
 			elif event.type == pygame.MOUSEMOTION:
 				pos = pygame.mouse.get_pos()
 				pos = (((pos[0] - c.border) // (c.t_size+1)), ((pos[1] - c.border) // (c.t_size+1)))
+
+				#---CAPTION---#
 				if -1 not in pos and c.size not in pos:
-					score = ' ' + str(tiles[pos[1]*c.size + pos[0]].score)
-					to_start = ' ' + str(tiles[pos[1]*c.size + pos[0]].score - tiles[pos[1]*c.size + pos[0]].score_to_end)
-					to_end = ' ' + str(tiles[pos[1]*c.size + pos[0]].score_to_end)
-					pygame.display.set_caption(str(pos) + to_start + to_end + score)
+					score = ',  sum: ' + str(tiles[pos[1]*c.size + pos[0]].score).rjust(3, '0')
+					to_start = ' to start: ' + str(tiles[pos[1]*c.size + pos[0]].score - tiles[pos[1]*c.size + pos[0]].score_to_end).rjust(3, '0')
+					to_end = ',  to goal: ' + str(tiles[pos[1]*c.size + pos[0]].score_to_end).rjust(3, '0')
+					position = 'Coordinates: ({}, {})'.format(str(pos[0]).rjust(2, '0'), str(pos[1]).rjust(2, '0'))
+					pygame.display.set_caption(position + ', Distance'+ to_start + to_end + score)
+				#-------------#
 
 			elif event.type == pygame.KEYDOWN:
 
@@ -106,6 +125,11 @@ def main():
 					smallest = start
 					solving = False
 
+			elif event.type == pygame.MOUSEBUTTONDOWN and not (active and not smallest):
+				if event.button == 4:
+					solving = True
+					wheel = True
+
 		#-------SOLVING-------#
 		if solving:
 			if smallest != start: smallest.state = color.EXPLORED
@@ -114,6 +138,7 @@ def main():
 			surrounding = [tile[0] for tile in around(smallest, tiles)]
 			if end in surrounding:
 				solving = False
+				wheel = False
 
 				# the exact shortest path
 				while start not in surrounding:
@@ -135,12 +160,12 @@ def main():
 			try:
 				active.remove(smallest)
 			except KeyError:
-				soling = False
+				solving = False
+				wheel = False
 
-			####################################
-			# TODO step by step path finding   #
-			# solving = False				   #
-			####################################
+			if wheel:
+				solving = False
+				wheel = False
 
 
 		#-------MOUSE-------#
