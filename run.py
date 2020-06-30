@@ -70,8 +70,7 @@ def main():
 	active = set()
 	smallest = start
 	wheel = False
-	start_shift = False
-	end_shift = False
+	shift = None
 
 	# main loop
 	running = True
@@ -87,7 +86,11 @@ def main():
 			# get mouse coordinates
 			elif event.type == pygame.MOUSEMOTION:
 				pos = pygame.mouse.get_pos()
-				pos = (((pos[0] - c.border) // (c.t_size+1)), ((pos[1] - c.border) // (c.t_size+1)))
+				pos = [((pos[0] - c.border) // (c.t_size+1)), ((pos[1] - c.border) // (c.t_size+1))]
+				if pos[0] < 0: pos[0] = 0
+				if pos[1] < 0: pos[1] = 0
+				if pos[0] >= c.size: pos[0] = c.size - 1
+				if pos[1] >= c.size: pos[1] = c.size - 1
 
 				#---CAPTION---#
 				if -1 not in pos and c.size not in pos:
@@ -172,22 +175,23 @@ def main():
 
 		#-------MOUSE-------#
 		mouse_pressed = pygame.mouse.get_pressed()
-		if -1 not in pos and c.size not in pos and 1 in mouse_pressed:
+		clicked = tiles[pos[1] * c.size + pos[0]]
+		if 1 in mouse_pressed:
 			clicked = tiles[pos[1] * c.size + pos[0]]
 
 			# forbidding overriting important tiles
 			if clicked.state in (color.ACTIVE, color.PATH, color.EXPLORED): pass
 
 			# grab and drag start
-			elif mouse_pressed[0] and start_shift or clicked.state == color.START:
-				start_shift = True
+			elif mouse_pressed[0] and clicked.state != color.END and (shift == 'start' or (shift == None and clicked.state == color.START)):
+				shift = 'start'
 				start.state = color.EMPTY
 				start = clicked
 				start.state = color.START
 				smallest = start
 
-			elif mouse_pressed[0] and end_shift or clicked.state == color.END:
-				end_shift = True
+			elif mouse_pressed[0] and clicked.state != color.START and (shift == 'goal' or (shift == None and clicked.state == color.END)):
+				shift = 'goal'
 				end.state = color.EMPTY
 				end = tiles[pos[1] * c.size + pos[0]]
 				end.state = color.END
@@ -211,23 +215,26 @@ def main():
 				else:
 					clicked.state = color.EMPTY
 
+		elif clicked.state in (color.START, color.END): shift = None
+
 		# release safety start
-		elif start_shift:
-			start_shift = False
+		elif shift == 'start':
+			shift = None
 			start.state = color.EMPTY
 			start = tiles[pos[1] * c.size + pos[0]]
 			start.state = color.START
 			smallest = start
 
 		# release safety end
-		elif end_shift:
-			end_shift = False
+		elif shift == 'goal':
+			shift = None
 			end.state = color.EMPTY
+			print(pos)
 			end = tiles[pos[1] * c.size + pos[0]]
 			end.state = color.END
 
 		# active cells purge
-		if end_shift or start_shift:
+		if -1 not in pos and active and shift:
 			erase = (color.START, color.END, color.WALL)
 			for tile in tiles:
 				if tile.state not in erase:
