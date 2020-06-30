@@ -70,6 +70,8 @@ def main():
 	active = set()
 	smallest = start
 	wheel = False
+	start_shift = False
+	end_shift = False
 
 	# main loop
 	running = True
@@ -174,11 +176,24 @@ def main():
 			clicked = tiles[pos[1] * c.size + pos[0]]
 
 			# forbidding overriting important tiles
-			if clicked.state in (color.END, color.START, color.ACTIVE, color.PATH, color.EXPLORED): pass
+			if clicked.state in (color.ACTIVE, color.PATH, color.EXPLORED): pass
+
+			# grab and drag start
+			elif mouse_pressed[0] and start_shift or clicked.state == color.START:
+				start_shift = True
+				start.state = color.EMPTY
+				start = clicked
+				start.state = color.START
+				smallest = start
+
+			elif mouse_pressed[0] and end_shift or clicked.state == color.END:
+				end_shift = True
+				end.state = color.EMPTY
+				end = tiles[pos[1] * c.size + pos[0]]
+				end.state = color.END
 
 			# wall or start
 			elif mouse_pressed[0] and clicked.state not in (color.START, color.END):
-				
 				if pygame.key.get_pressed()[pygame.K_LSHIFT]:
 					start.state = color.EMPTY
 					start = clicked
@@ -195,6 +210,32 @@ def main():
 					end.state = color.END
 				else:
 					clicked.state = color.EMPTY
+
+		# release safety start
+		elif start_shift:
+			start_shift = False
+			start.state = color.EMPTY
+			start = tiles[pos[1] * c.size + pos[0]]
+			start.state = color.START
+			smallest = start
+
+		# release safety end
+		elif end_shift:
+			end_shift = False
+			end.state = color.EMPTY
+			end = tiles[pos[1] * c.size + pos[0]]
+			end.state = color.END
+
+		# active cells purge
+		if end_shift or start_shift:
+			erase = (color.START, color.END, color.WALL)
+			for tile in tiles:
+				if tile.state not in erase:
+					tile.state = color.EMPTY
+					tile.score = tile.score_to_end = 0
+			active = set()
+			smallest = start
+			solving = False
 
 		display(window, tiles)
 
