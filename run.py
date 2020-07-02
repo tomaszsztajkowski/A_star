@@ -37,7 +37,7 @@ def around(center, tiles):
 	for i in coodinates:
 		temp = (xy[0] + i[0], xy[1] + i[1])
 		if not (-1 in temp or c.size in temp):
-			out.append((tiles[temp[1]*c.size + temp[0]], 14))
+			out.append((tiles[temp[1]*c.size + temp[0]], c.search_type))
 	
 	return out
 
@@ -47,7 +47,8 @@ def find_next(active, search, current, end):
 		x_distance = abs(end.x - tile[0].x)
 		y_distance = abs(end.y - tile[0].y)
 		if tile[0].score_to_end == 0:
-			tile[0].score_to_end = min(x_distance, y_distance) * 14 + abs(x_distance - y_distance) * 10
+			tile[0].score_to_end = min(x_distance, y_distance) * c.search_type + abs(x_distance - y_distance) * 10
+			c.calculated += 1
 		new_score = tile[0].score_to_end + tile[1] + current.score - current.score_to_end
 		if tile[0].score == 0 or new_score < tile[0].score: tile[0].score = new_score
 		tile[0].state = color.ACTIVE
@@ -71,6 +72,7 @@ def main():
 	smallest = start
 	wheel = False
 	shift = None
+	c.calculated = 0
 
 	# main loop
 	running = True
@@ -91,15 +93,7 @@ def main():
 				if pos[1] < 0: pos[1] = 0
 				if pos[0] >= c.size: pos[0] = c.size - 1
 				if pos[1] >= c.size: pos[1] = c.size - 1
-
-				#---CAPTION---#
-				if -1 not in pos and c.size not in pos:
-					score = ',  sum: ' + str(tiles[pos[1]*c.size + pos[0]].score).rjust(3, '0')
-					to_start = ' to start: ' + str(tiles[pos[1]*c.size + pos[0]].score - tiles[pos[1]*c.size + pos[0]].score_to_end).rjust(3, '0')
-					to_end = ',  to goal: ' + str(tiles[pos[1]*c.size + pos[0]].score_to_end).rjust(3, '0')
-					position = 'Coordinates: ({}, {})'.format(str(pos[0]).rjust(2, '0'), str(pos[1]).rjust(2, '0'))
-					pygame.display.set_caption(position + ', Distance'+ to_start + to_end + score)
-				#-------------#
+				
 
 			elif event.type == pygame.KEYDOWN:
 
@@ -114,8 +108,11 @@ def main():
 								tile.score = tile.score_to_end = 0
 						active = set()
 						smallest = start
+						c.calculated = 0
 
-					else: solving = True
+					else:
+						solving = True
+						smallest = start
 
 				# erase
 				elif event.key == pygame.K_ESCAPE:
@@ -129,6 +126,12 @@ def main():
 					active = set()
 					smallest = start
 					solving = False
+					c.calculated = 0
+
+				# solving type
+				elif event.key == pygame.K_1:
+					c.search_type = c.manhattan if c.search_type == c.euclidean else c.euclidean
+					print(c.search_type)
 
 			elif event.type == pygame.MOUSEBUTTONDOWN and not (active and not smallest):
 				if event.button == 4:
@@ -146,7 +149,7 @@ def main():
 				wheel = False
 
 				# the exact shortest path
-				while start not in surrounding:
+				while start not in surrounding and active:
 					smallest.state = color.PATH
 					surrounding = [tile[0] for tile in around(smallest, tiles)]
 					for tile in surrounding:
@@ -159,6 +162,7 @@ def main():
 
 			# next tile with the smallest value
 			find_next(active, around(smallest, tiles), smallest, end)
+
 			for i, tile in enumerate(list(active)):
 				if i == 0 or tile.score < smallest.score: smallest = tile
 				if tile.score == smallest.score and tile.score_to_end < smallest.score_to_end: smallest = tile
@@ -190,6 +194,7 @@ def main():
 				start.state = color.START
 				smallest = start
 
+			# grab and drag goal
 			elif mouse_pressed[0] and clicked.state != color.START and (shift == 'goal' or (shift == None and clicked.state == color.END)):
 				shift = 'goal'
 				end.state = color.EMPTY
@@ -215,9 +220,10 @@ def main():
 				else:
 					clicked.state = color.EMPTY
 
+		# release safety
 		elif clicked.state in (color.START, color.END): shift = None
 
-		# release safety start
+		# release delay start
 		elif shift == 'start':
 			shift = None
 			start.state = color.EMPTY
@@ -225,11 +231,10 @@ def main():
 			start.state = color.START
 			smallest = start
 
-		# release safety end
+		# release delay end
 		elif shift == 'goal':
 			shift = None
 			end.state = color.EMPTY
-			print(pos)
 			end = tiles[pos[1] * c.size + pos[0]]
 			end.state = color.END
 
@@ -243,8 +248,19 @@ def main():
 			active = set()
 			smallest = start
 			solving = False
+			c.calculated = 0
 
 		display(window, tiles)
+
+		#---CAPTION---#
+		score = ',  sum: ' + str(tiles[pos[1]*c.size + pos[0]].score).rjust(3, '0')
+		to_start = ' to start: ' + str(tiles[pos[1]*c.size + pos[0]].score - tiles[pos[1]*c.size + pos[0]].score_to_end).rjust(3, '0')
+		to_end = ',  to goal: ' + str(tiles[pos[1]*c.size + pos[0]].score_to_end).rjust(3, '0')
+		position = 'Coordinates: ({}, {})'.format(str(pos[0]).rjust(2, '0'), str(pos[1]).rjust(2, '0'))
+		mode = 'Euclidean, ' if c.search_type == c.euclidean else 'Manhattan, '
+		calc = ', Active: {}'.format(c.calculated)
+		pygame.display.set_caption(mode + position + ', Distance'+ to_start + to_end + score + calc)
+		#-------------#		
 
 
 if __name__ == '__main__': main()
