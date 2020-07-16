@@ -3,6 +3,7 @@ from time import sleep
 from tile import Tile
 import colors as color
 import constants as c
+from random import shuffle, randint
 
 def display(window, tiles):
 	# background
@@ -15,7 +16,7 @@ def display(window, tiles):
 
 	pygame.display.update()
 
-def around(center, tiles):
+def around(center, tiles, cardinal=False, allow_walls=False, bias=None):
 	xy = (center.x, center.y)
 	out = []
 	corners = []
@@ -23,9 +24,12 @@ def around(center, tiles):
 
 	for i in ((-1, 0), (0, -1), (0, 1), (1, 0)):
 		temp = (xy[0] + i[0], xy[1] + i[1])
-		if not (-1 in temp or c.size in temp) and tiles[temp[1]*c.size + temp[0]].state != color.WALL:
+		if not (-1 in temp or c.size in temp) and (tiles[temp[1]*c.size + temp[0]].state != color.WALL or allow_walls):
 			out.append((tiles[temp[1]*c.size + temp[0]], 10))
+			if cardinal and i in ((-1, 0), (1, 0)) and bias == 0: out.append((tiles[temp[1]*c.size + temp[0]], 10))
+			if cardinal and i in ((0, -1), (0, 1)) and bias == 1: out.append((tiles[temp[1]*c.size + temp[0]], 10))
 			corners.append(i)
+	if cardinal: return out
 
 	# not allowing going through connected corners
 	coodinates = [] 
@@ -54,11 +58,27 @@ def find_next(active, search, current, end):
 		tile[0].state = color.ACTIVE
 		active.add(tile[0])
 
+def random_walk(tile, tiles, bias):
+	dirs = around(tile, tiles, cardinal=True, allow_walls=True, bias=bias)
+	while dirs:
+		shuffle(dirs)
+		peek = dirs.pop()[0]
+		if peek.neighbours < 3 and peek.state == color.WALL:
+			peek.state = color.EMPTY
+			for a in around(peek, tiles, allow_walls=True):
+				a[0].neighbours += 1
+			return peek
+
 def main():
 	pygame.display.set_icon(pygame.image.load('icon.png'))
 
 	# not meant to change
 	tiles = [Tile(i%c.size, i//c.size) for i in range(c.size**2)]
+	l = list(map(list, zip(*[[tiles[i*c.size + j] for j in range(c.size)] for i in range(c.size)])))
+	tiles_t = []
+	for sublist in l:
+	    for item in sublist:
+	        tiles_t.append(item)
 	window = pygame.display.set_mode((c.win_size_x, c.win_size_y))
 
 	# meant to change
@@ -73,6 +93,10 @@ def main():
 	wheel = False
 	shift = None
 	c.calculated = 0
+	length = 0
+	peek = None
+	generation = False
+	bias = randint(0, 1)
 
 	# main loop
 	running = True
@@ -109,16 +133,20 @@ def main():
 						active = set()
 						smallest = start
 						c.calculated = 0
+						length = 0
 
 					else:
 						solving = True
 						smallest = start
+						generation = False
 
 				# erase
 				elif event.key == pygame.K_ESCAPE:
 					if pygame.key.get_pressed()[pygame.K_LSHIFT]:
 						erase = (color.START, color.END, color.WALL)
-					else: erase = (color.START, color.END)
+					else:
+						erase = (color.START, color.END)
+						peek = None
 					for tile in tiles:
 						if tile.state not in erase:
 							tile.state = color.EMPTY
@@ -127,11 +155,31 @@ def main():
 					smallest = start
 					solving = False
 					c.calculated = 0
+					length = 0
+					generation = False
+
 
 				# solving type
 				elif event.key == pygame.K_1:
 					c.search_type = c.manhattan if c.search_type == c.euclidean else c.euclidean
 					print(c.search_type)
+
+				# maze generator
+				elif event.key == pygame.K_m and not solving:
+					if generation:
+						generation = False
+						continue
+					if peek:
+						generation = True
+						continue
+					for i in tiles:
+						if i not in (start, end): i.state = color.WALL
+						i.neighbours = 0
+					for a in around(tiles[0], tiles): a[0].neighbours += 1
+
+					generation = True	
+					peek = tiles[randint(0, len(tiles) - 1)]
+					
 
 			elif event.type == pygame.MOUSEBUTTONDOWN and not (active and not smallest):
 				if event.button == 4:
@@ -151,6 +199,7 @@ def main():
 				# the exact shortest path
 				while start not in surrounding and active:
 					smallest.state = color.PATH
+					length += 1
 					surrounding = [tile[0] for tile in around(smallest, tiles)]
 					for tile in surrounding:
 						if tile.state != color.EXPLORED: continue
@@ -176,8 +225,29 @@ def main():
 				solving = False
 				wheel = False
 
+		#-----GENERATION------#
+		if generation:
+			if peek:
+				peek = random_walk(peek, tiles, bias)
+				if randint(0, c.size // 10) == 0:
+					bias = 0 if bias == 1 else 1
+			if not peek:
+				index = 0
+				search = (tiles, tiles[::-1], tiles_t, tiles_t[::-1])[randint(0, 3)]
+				while not peek:
+					if search[index].state == color.EMPTY:
+						for a in around(search[index], search, cardinal=True, allow_walls=True):
+							if a[0].neighbours < 3 and a[0].state == color.WALL:
+								peek = search[index]
+								break
+					index += 1
+					if index == len(search):
+						generation = False
+						break
+				bias = randint(0, 1)
 
-		#-------MOUSE-------#
+
+		#--------MOUSE--------#
 		mouse_pressed = pygame.mouse.get_pressed()
 		clicked = tiles[pos[1] * c.size + pos[0]]
 		if 1 in mouse_pressed:
@@ -249,17 +319,18 @@ def main():
 			smallest = start
 			solving = False
 			c.calculated = 0
+			length = 0
 
 		display(window, tiles)
 
 		#---CAPTION---#
-		score = ',  sum: ' + str(tiles[pos[1]*c.size + pos[0]].score).rjust(3, '0')
-		to_start = ' to start: ' + str(tiles[pos[1]*c.size + pos[0]].score - tiles[pos[1]*c.size + pos[0]].score_to_end).rjust(3, '0')
-		to_end = ',  to goal: ' + str(tiles[pos[1]*c.size + pos[0]].score_to_end).rjust(3, '0')
-		position = 'Coordinates: ({}, {})'.format(str(pos[0]).rjust(2, '0'), str(pos[1]).rjust(2, '0'))
+		score = ',  sum: ' + str(tiles[pos[1]*c.size + pos[0]].score).rjust(4, '0')
+		to_start = ' to start: ' + str(tiles[pos[1]*c.size + pos[0]].score - tiles[pos[1]*c.size + pos[0]].score_to_end).rjust(4, '0')
+		to_end = ',  to goal: ' + str(tiles[pos[1]*c.size + pos[0]].score_to_end).rjust(4, '0')
+		position = '' # 'Coordinates: ({}, {})'.format(str(pos[0]).rjust(2, '0'), str(pos[1]).rjust(2, '0'))
 		mode = 'Euclidean, ' if c.search_type == c.euclidean else 'Manhattan, '
 		calc = ', Active: {}'.format(c.calculated)
-		pygame.display.set_caption(mode + position + ', Distance'+ to_start + to_end + score + calc)
+		pygame.display.set_caption(mode + position + ', Distance'+ to_start + to_end + score + calc + ' Length: {}'.format(length))
 		#-------------#		
 
 

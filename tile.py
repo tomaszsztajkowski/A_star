@@ -9,6 +9,7 @@ class Tile():
 		self.state = color.EMPTY
 		self.score_to_end = 0
 		self.score = 0
+		self.neighbours = 0
 
 	def draw(self, window):
 		#print(self.x, self.y)
